@@ -18,9 +18,9 @@ echo
 HOST_CPUS=$(nproc)
 
 if [ "${FAST:-0}" != "0" ]; then
-  THREADS=(1 8)
+  THREADS=(1 64)
   ROW_SIZES=(64)
-  RING_KS=(2)
+  RING_KS=(1)
   DISTS=(flat)
 else
   THREADS=(1 2 4 8 16 32 64 72)
