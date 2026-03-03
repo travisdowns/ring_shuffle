@@ -16,8 +16,6 @@ echo "${BUILD_CMD[*]}"
 echo "Build OK: $BIN"
 echo
 
-HOST_CPUS=$(nproc)
-
 if [ "${FAST:-0}" == "1" ]; then
   THREADS=(64)
   ROW_SIZES=(64)
@@ -34,20 +32,21 @@ else
   RING_KS=(1 2 3 4)
   DISTS=(flat normal)
 fi
-
-THREADS=($(for t in "${THREADS[@]}"; do [ "$t" -le "$HOST_CPUS" ] && echo "$t"; done))
 ROWS=8192
 CHUNKS_PER_PRODUCER=1000
 REPEATS=5
-MAX_DATA_GB=128  # skip batch when total data exceeds this
+MAX_DATA_GB=128 # skip batch when total data exceeds this
 
-run() { [ "${V:-0}" != "0" ] && echo "$*" >&2; "$@"; }
+run() {
+  [ "${V:-0}" != "0" ] && echo "$*" >&2
+  "$@"
+}
 
 for dist in "${DISTS[@]}"; do
   for rs in "${ROW_SIZES[@]}"; do
     for t in "${THREADS[@]}"; do
       CHUNKS=$((CHUNKS_PER_PRODUCER * t))
-      TOTAL_GB=$(( CHUNKS * ROWS * rs / 1000000000 ))
+      TOTAL_GB=$((CHUNKS * ROWS * rs / 1000000000))
       echo "M=$t N=$t rows=$ROWS rs=$rs chunks=$CHUNKS r=$REPEATS dist=$dist"
       if [ "$TOTAL_GB" -lt "$MAX_DATA_GB" ]; then
         run "$BIN" BC "$t" "$t" "$ROWS" "$rs" "$CHUNKS" "$REPEATS" 2 "$dist"
