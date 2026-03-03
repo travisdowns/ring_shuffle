@@ -15,10 +15,21 @@ g++ -std=c++20 -O2 $ARCH_FLAGS -pthread ${EXTRA_CXXFLAGS:-} -o "$BIN" "$SRC"
 echo "Build OK: $BIN"
 echo
 
-THREADS=(1 2 4 8 16 32 64 72)
-ROW_SIZES=(32 64 128 256)
-RING_KS=(1 2 3 4)
-DISTS=(flat normal)
+HOST_CPUS=$(nproc)
+
+if [ "${FAST:-0}" != "0" ]; then
+  THREADS=(1 8)
+  ROW_SIZES=(64)
+  RING_KS=(2)
+  DISTS=(flat)
+else
+  THREADS=(1 2 4 8 16 32 64 72)
+  ROW_SIZES=(32 64 128 256)
+  RING_KS=(1 2 3 4)
+  DISTS=(flat normal)
+fi
+
+THREADS=($(for t in "${THREADS[@]}"; do [ "$t" -le "$HOST_CPUS" ] && echo "$t"; done))
 ROWS=8192
 CHUNKS_PER_PRODUCER=1000
 REPEATS=5
