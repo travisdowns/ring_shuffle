@@ -18,11 +18,16 @@ echo
 
 HOST_CPUS=$(nproc)
 
-if [ "${FAST:-0}" != "0" ]; then
+if [ "${FAST:-0}" == "1" ]; then
   THREADS=(64)
   ROW_SIZES=(64)
   RING_KS=(1)
   DISTS=(flat)
+elif [ "${FAST:-0}" == "2" ]; then
+  THREADS=(64)
+  ROW_SIZES=(32 128)
+  RING_KS=(1 4)
+  DISTS=(flat normal)
 else
   THREADS=(1 2 4 8 16 32 64 72)
   ROW_SIZES=(32 64 128 256)
