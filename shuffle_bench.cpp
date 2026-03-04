@@ -1,6 +1,6 @@
 // shuffle_bench.cpp — Standalone benchmark for three intra-process shuffle algorithms.
 // Build: g++ -std=c++20 -O2 -pthread -o shuffle_bench shuffle_bench.cpp
-//   (add -msse4.2 on x86 for hardware CRC32; ARM uses software fallback automatically)
+//   (add -msse4.2 on x86 or -march=armv8-a+crc on aarch64 for hardware CRC32)
 // Usage: ./shuffle_bench [variants] [M] [N] [rows_per_chunk] [row_size] [num_chunks] [repeats] [ring_k] [dist]
 //   variants: string of letters selecting which algorithms to run (default: BCR)
 //     B = Batch Partitioning, C = Channel Streaming, R = Ring-Buffer Streaming
@@ -22,14 +22,17 @@
 #include <span>
 #include <thread>
 #include <algorithm>
+#include <array>
 #include <vector>
 
 #ifdef __linux__
 #include <sched.h>
 #endif
 
-#ifdef __SSE4_2__
+#if defined(__SSE4_2__)
 #include <nmmintrin.h>
+#elif defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
+#include <arm_acle.h>
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,27 +111,33 @@ static ChunkPtr generate_chunk(std::mt19937_64& rng, int rows, int row_size, boo
     return chunk;
 }
 
-#ifdef __SSE4_2__
+#if defined(__SSE4_2__)
 static uint32_t crc32_bytes(const uint8_t* data, size_t len) {
     uint32_t crc = 0;
     for (size_t i = 0; i < len; ++i)
         crc = _mm_crc32_u8(crc, data[i]);
     return crc;
 }
+#elif defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
+static uint32_t crc32_bytes(const uint8_t* data, size_t len) {
+    uint32_t crc = 0;
+    for (size_t i = 0; i < len; ++i)
+        crc = __crc32cb(crc, data[i]);
+    return crc;
+}
 #else
 // Software CRC32C fallback (Castagnoli polynomial).
-static uint32_t crc32c_table[256];
-static bool crc32c_table_init = [] {
+static constexpr auto crc32c_table = [] {
+    std::array<uint32_t, 256> t{};
     for (uint32_t i = 0; i < 256; ++i) {
         uint32_t c = i;
         for (int j = 0; j < 8; ++j)
             c = (c >> 1) ^ (c & 1 ? 0x82F63B78u : 0);
-        crc32c_table[i] = c;
+        t[i] = c;
     }
-    return true;
+    return t;
 }();
 static uint32_t crc32_bytes(const uint8_t* data, size_t len) {
-    (void)crc32c_table_init;
     uint32_t crc = 0;
     for (size_t i = 0; i < len; ++i)
         crc = (crc >> 8) ^ crc32c_table[(crc ^ data[i]) & 0xFF];
