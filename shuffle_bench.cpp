@@ -112,19 +112,9 @@ static ChunkPtr generate_chunk(std::mt19937_64& rng, int rows, int row_size, boo
 }
 
 #if defined(__SSE4_2__)
-static uint32_t crc32_bytes(const uint8_t* data, size_t len) {
-    uint32_t crc = 0;
-    for (size_t i = 0; i < len; ++i)
-        crc = _mm_crc32_u8(crc, data[i]);
-    return crc;
-}
+static inline uint32_t crc32_u8(uint32_t crc, uint8_t b) { return _mm_crc32_u8(crc, b); }
 #elif defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-static uint32_t crc32_bytes(const uint8_t* data, size_t len) {
-    uint32_t crc = 0;
-    for (size_t i = 0; i < len; ++i)
-        crc = __crc32cb(crc, data[i]);
-    return crc;
-}
+static inline uint32_t crc32_u8(uint32_t crc, uint8_t b) { return __crc32cb(crc, b); }
 #else
 // Software CRC32C fallback (Castagnoli polynomial).
 static constexpr auto crc32c_table = [] {
@@ -137,13 +127,17 @@ static constexpr auto crc32c_table = [] {
     }
     return t;
 }();
+static inline uint32_t crc32_u8(uint32_t crc, uint8_t b) {
+    return (crc >> 8) ^ crc32c_table[(crc ^ b) & 0xFF];
+}
+#endif
+
 static uint32_t crc32_bytes(const uint8_t* data, size_t len) {
     uint32_t crc = 0;
     for (size_t i = 0; i < len; ++i)
-        crc = (crc >> 8) ^ crc32c_table[(crc ^ data[i]) & 0xFF];
+        crc = crc32_u8(crc, data[i]);
     return crc;
 }
-#endif
 
 static uint32_t partition_hash(const uint8_t* row, int row_size, int N) {
     size_t len = static_cast<size_t>(std::min(row_size, 4));

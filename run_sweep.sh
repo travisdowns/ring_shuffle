@@ -16,22 +16,33 @@ echo "${BUILD_CMD[*]}"
 echo "Build OK: $BIN"
 echo
 
-if [ "${FAST:-0}" == "1" ]; then
+SHUFFLE_SUBSET="${SHUFFLE_SUBSET:-3}"
+
+if [ "$SHUFFLE_SUBSET" == "1" ]; then
   THREADS=(64)
   ROW_SIZES=(64)
   RING_KS=(1)
   DISTS=(flat)
-elif [ "${FAST:-0}" == "2" ]; then
+elif [ "$SHUFFLE_SUBSET" == "2" ]; then
   THREADS=(64)
   ROW_SIZES=(32 128)
   RING_KS=(1 4)
   DISTS=(flat normal)
-else
-  THREADS=(1 2 4 8 16 32 64 72)
+elif [ "$SHUFFLE_SUBSET" == "3" ]; then
+  THREADS=(1 2 4 8 16 32 64 88 176)
+  ROW_SIZES=(32 64)
+  RING_KS=(1 2)
+  DISTS=(flat normal)
+elif [ "$SHUFFLE_SUBSET" == "10" ]; then
+  THREADS=(1 2 4 8 16 32 64 88 176)
   ROW_SIZES=(32 64 128 256)
   RING_KS=(1 2 3 4)
   DISTS=(flat normal)
+else
+  echo "Invalid SHUFFLE_SUBSET=$SHUFFLE_SUBSET (valid: 1, 2, 3, 10)" >&2
+  exit 1
 fi
+
 ROWS=8192
 CHUNKS_PER_PRODUCER=1000
 REPEATS=5
